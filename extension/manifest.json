@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "focus-observer: tabs",
+  "version": "0.1.0",
+  "description": "Emits tab-focus intervals as OTLP spans to the local collector. Records origin and path, never query strings.",
+  "permissions": ["tabs", "storage"],
+  "host_permissions": ["http://127.0.0.1:4318/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}
