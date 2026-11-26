@@ -147,7 +147,39 @@ function intervalFor(tab) {
   if (!tab || !tab.url) return null;
   const r = redact(tab.url);
   if (!r) return null;
-  return { url: r.url, hasQuery: r.hasQuery, title: tab.title || "" };
+  const title = tab.title || "";
+  return {
+    url: r.url,
+    hasQuery: r.hasQuery,
+    title: r.hasQuery && isUrlTitle(title, tab.url) ? "" : title,
+  };
+}
+
+/**
+ * Whether a tab's title is just its URL, query string and all.
+ *
+ * Chrome titles a page that has no <title> with its own URL, and does the
+ * same for every page in the moments before the real title arrives. That
+ * string keeps the query and the fragment, so recording it would hand back
+ * exactly what `redact` refused — a search, an OAuth code — one attribute
+ * over. Such a title is dropped: it names nothing `tab.url` does not.
+ *
+ * The title is Chrome's DISPLAY form, not the URL itself: no scheme, no
+ * `www.`, escapes and punycode decoded. So the test is on the host alone —
+ * does the title start with this page's host — read back through the URL
+ * parser so both sides are in the same form. A real title that happens to
+ * contain `?` or `#` has spaces or another name in that position and stays.
+ */
+function isUrlTitle(title, rawUrl) {
+  if (!/[?#]/.test(title)) return false;
+  const bare = (host) => host.replace(/^www\./, "");
+  const page = new URL(rawUrl);
+  const head = title.replace(/^https?:\/\//i, "").split(/[/?#]/)[0];
+  try {
+    return bare(new URL(`${page.protocol}//${head}`).host) === bare(page.host);
+  } catch {
+    return false;
+  }
 }
 
 async function activeTab() {

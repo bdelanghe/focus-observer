@@ -24,6 +24,7 @@
           # The extension parses, posts only to the local collector, and records no query string or fragment.
           extension = pkgs.runCommand "focus-observer-extension" { nativeBuildInputs = [ pkgs.nodejs pkgs.jq ]; } ''
             node --check ${./extension/background.js}
+            (cd ${self} && node --test "test/*.test.mjs")
             jq -e '.manifest_version == 3 and (.host_permissions == ["http://127.0.0.1:4318/*"])' ${./extension/manifest.json}
             grep -q 'const OTLP = "http://127.0.0.1:4318/v1/traces"' ${./extension/background.js}
             grep -q 'url: u.origin + u.pathname,' ${./extension/background.js}
