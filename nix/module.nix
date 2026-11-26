@@ -4,7 +4,7 @@
 #   programs.focusObserver.enable            — the resident observer: NSWorkspace + AXObserver focus intervals as OTLP spans.
 #   programs.focusObserver.tabs.enable       — the Chrome extension (the browser half): active-tab intervals as OTLP spans.
 #   programs.focusObserver.appSampler.enable — the once-a-minute `lsappinfo` sampler: frontmost bundle id + idle seconds as JSONL.
-# Spans go to an OTLP/HTTP collector on 127.0.0.1:4318 (FOCUS_OBSERVER_OTLP overrides it for the observer).
+# Spans go to an OTLP/HTTP collector on 127.0.0.1:4318 (OTLP_TRACES_URL overrides it for the observer).
 #
 # ── the observer
 # focus-observer: which app has the screen, as intervals rather than samples.
