@@ -30,6 +30,15 @@
             grep -q 'url: u.origin + u.pathname,' ${./extension/background.js}
             touch $out
           '';
+
+          # The override the module documents is the one the observer reads.
+          observer-env = pkgs.runCommand "focus-observer-env" { } ''
+            var=$(grep -o 'environment\["[A-Z_]*"\] *$' ${./src/observer.swift} | grep -o '[A-Z_]\{2,\}')
+            echo "observer reads: $var"
+            grep "^# Spans go to" ${./nix/module.nix}
+            grep "^# Spans go to" ${./nix/module.nix} | grep -qw "$var"
+            touch $out
+          '';
         }
         // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
           # Under Home Manager: nothing by default; each part emits exactly its own agent / activation step.
