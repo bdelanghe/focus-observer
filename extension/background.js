@@ -155,9 +155,27 @@ async function activeTab() {
   return tab;
 }
 
+/**
+ * Whether the tab's window is the one being looked at.
+ *
+ * `tab.active` only says the tab is the selected one IN ITS WINDOW. Every
+ * window has one, focused or not, and they keep firing events while Chrome
+ * is in the background: a mail tab retitling itself to "(1) Inbox" would
+ * otherwise reopen the interval `windows.onFocusChanged` just closed, and
+ * Chrome would absorb the minutes spent in the terminal after all.
+ */
+async function looksAt(tab) {
+  const win = await chrome.windows.get(tab.windowId);
+  return win.focused;
+}
+
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   try {
-    await transition(intervalFor(await chrome.tabs.get(tabId)));
+    const tab = await chrome.tabs.get(tabId);
+    // A tab selected in a window that is not focused. If the window is on
+    // its way to the front, `windows.onFocusChanged` reports the tab.
+    if (!(await looksAt(tab))) return;
+    await transition(intervalFor(tab));
   } catch {
     // A tab that closed between the event and the lookup.
   }
@@ -171,6 +189,12 @@ chrome.tabs.onUpdated.addListener(async (_id, changeInfo, tab) => {
   // `status` fires twice per navigation and `title` often lands after `url`;
   // only act once the URL has settled.
   if (!changeInfo.url && !changeInfo.title) return;
+  try {
+    if (!(await looksAt(tab))) return;
+  } catch {
+    // A window that closed between the event and the lookup.
+    return;
+  }
   await transition(intervalFor(tab));
 });
 
