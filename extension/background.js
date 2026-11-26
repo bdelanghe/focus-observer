@@ -122,24 +122,46 @@ async function emit(open, end) {
  * reason `windows.onFocusChanged` is observed: without it, a tab interval
  * keeps running while you are in another app, and Chrome absorbs every minute
  * you spent in the terminal.
+ *
+ * Transitions run ONE AT A TIME. A single switch arrives as several events —
+ * `tabs.onActivated` with `windows.onFocusChanged`, `tabs.onUpdated` for the
+ * URL and again for the title — and each handler awaits storage. Run
+ * concurrently they all read the same open interval and each emit it, so one
+ * interval lands in the trace store two or three times with different ends.
+ *
+ * The queue lives in a variable, which is safe where the interval itself is
+ * not: it only orders handlers that are running, and a worker with a handler
+ * running is not the one being killed.
+ *
+ * The POST happens outside the queue and after the record has moved on. A
+ * collector that accepts the connection and never answers would otherwise
+ * hold every later transition behind it, and the page being left would keep
+ * absorbing the time.
  */
-async function transition(next) {
-  const now = Date.now();
-  const { [KEY]: open } = await chrome.storage.session.get(KEY);
+let queue = Promise.resolve();
 
-  if (open) {
+function transition(next) {
+  const now = Date.now();
+
+  const swapped = queue.then(async () => {
+    const { [KEY]: open } = await chrome.storage.session.get(KEY);
+
     // Re-activating the same page is not a switch. Chrome fires onUpdated
     // several times per navigation, and onActivated again when a window
     // regains focus on the tab it already had.
-    if (next && next.url === open.url && next.title === open.title) return;
-    await emit(open, now);
-  }
+    if (open && next && next.url === open.url && next.title === open.title) return null;
 
-  if (next) {
-    await chrome.storage.session.set({ [KEY]: { ...next, start: now } });
-  } else {
-    await chrome.storage.session.remove(KEY);
-  }
+    if (next) {
+      await chrome.storage.session.set({ [KEY]: { ...next, start: now } });
+    } else {
+      await chrome.storage.session.remove(KEY);
+    }
+    return open;
+  });
+  // A failed transition must not wedge the ones behind it.
+  queue = swapped.catch(() => {});
+
+  return swapped.then((closed) => closed && emit(closed, now));
 }
 
 /** Build the interval record for a tab, or null if it is not observable. */
